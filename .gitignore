@@ -1,0 +1,6 @@
+constancias_originales/
+__pycache__/
+*.pyc
+token.json
+credentials.json
+.vscode/

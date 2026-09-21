@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador de Constancias</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #222; }
+    h1 { color: #333; }
+    .aviso {
+      background: #fff3cd; border-left: 4px solid #ffc107;
+      padding: .8rem 1rem; border-radius: 6px; margin: 1rem 0;
+      font-size: .95rem;
+    }
+    #buscador { display: flex; gap: .5rem; margin: 1.5rem 0; }
+    #nombre { flex: 1; padding: .8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+    button { padding: .8rem 1.5rem; background: #0066cc; color: white; border: none;
+             border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    button:hover { background: #0055aa; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .resultado { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; margin-bottom: .8rem; }
+    .resultado a { display: inline-block; margin-top: .5rem; margin-right: .5rem; padding: .5rem 1rem;
+                   background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-size: .9rem; }
+    .resultado a.ver { background: #17a2b8; }
+    .error { color: #c00; }
+    .loader { color: #666; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Buscador de Constancias</h1>
+
+  <div class="aviso">
+    ⚠️ <strong>Importante:</strong> Tu constancia estará disponible para descarga por <strong>5 días</strong>.
+    Por favor, guárdala en tu dispositivo. Después de este tiempo, el enlace puede dejar de funcionar.
+  </div>
+
+  <div id="buscador">
+    <input id="nombre" placeholder="Ej. Juan Pérez" autocomplete="off">
+    <button id="btn" onclick="buscar()">Buscar</button>
+  </div>
+
+  <div id="resultados"></div>
+
+  <script>
+    let datos = null;
+
+    // Normaliza texto: minúsculas, sin acentos
+    function normalizar(str) {
+      return (str || '').toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+    }
+
+    // Carga el JSON local
+    async function cargarDatos() {
+      if (datos) return datos;
+      const res = await fetch('datos.json');
+      if (!res.ok) throw new Error('No se pudo cargar datos.json');
+      datos = await res.json();
+      return datos;
+    }
+
+    async function buscar() {
+      const consulta = document.getElementById('nombre').value.trim();
+      const cont = document.getElementById('resultados');
+      const btn = document.getElementById('btn');
+      cont.innerHTML = '';
+
+      const terminos = normalizar(consulta).split(/\s+/).filter(t => t.length > 1);
+      if (terminos.length < 2) {
+        cont.innerHTML = '<p class="error">Escribe al menos nombre y un apellido.</p>';
+        return;
+      }
+
+      btn.disabled = true;
+      cont.innerHTML = '<p class="loader">Buscando...</p>';
+
+      try {
+        const data = await cargarDatos();
+        const baseUrl = data.base_url || '';
+        const archivos = data.archivos || [];
+
+        const coincidencias = archivos.filter(item => {
+          const nombreNorm = normalizar(item.nombre);
+          return terminos.every(t => nombreNorm.includes(t));
+        });
+
+        if (coincidencias.length === 0) {
+          cont.innerHTML = '<p>No se encontraron constancias con ese nombre.</p>';
+          return;
+        }
+
+        coincidencias.forEach(item => {
+          const url = baseUrl + encodeURIComponent(item.archivo);
+          const div = document.createElement('div');
+          div.className = 'resultado';
+          div.innerHTML = `
+            <strong>${item.nombre}</strong><br>
+            <a href="${url}" target="_blank" download>📄 Descargar</a>
+            <a href="${url}" target="_blank" class="ver">👁 Ver</a>
+          `;
+          cont.appendChild(div);
+        });
+
+      } catch (err) {
+        console.error(err);
+        cont.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('nombre').addEventListener('keydown', e => {
+      if (e.key === 'Enter') buscar();
+    });
+  </script>
+</body>
+</html>
